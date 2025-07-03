@@ -32,6 +32,7 @@ public class ProductStepDefinitions {
     private MockMvc mockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<String, Long> productIds = new HashMap<>(); // Store product name to ID mappings
+    private String accessToken = "mock-jwt-token"; // Mock token for tests
 
     @Before
     public void setup() {
@@ -52,6 +53,7 @@ public class ProductStepDefinitions {
 
             String response = mockMvc.perform(post("/api/products")
                             .contentType("application/json")
+                            .header("Authorization", "Bearer " + accessToken)
                             .content(json))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
@@ -81,6 +83,7 @@ public class ProductStepDefinitions {
 
         String response = mockMvc.perform(post("/api/products")
                         .contentType("application/json")
+                        .header("Authorization", "Bearer " + accessToken)
                         .content(json))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
@@ -125,6 +128,7 @@ public class ProductStepDefinitions {
 
         mockMvc.perform(put("/api/products/" + id)
                         .contentType("application/json")
+                        .header("Authorization", "Bearer " + accessToken)
                         .content(json))
                 .andExpect(status().isOk());
     }
