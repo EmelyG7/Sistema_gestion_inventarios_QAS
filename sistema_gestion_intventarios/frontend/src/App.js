@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useKeycloak } from '@react-keycloak/web';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import './App.css';
 
-function App() {
-  const { keycloak, initialized } = useKeycloak();
+const App = ({ keycloak }) => {
   const [products, setProducts] = useState([]);
   const [newProduct, setNewProduct] = useState({
     name: '',
@@ -12,263 +11,245 @@ function App() {
     price: '',
     initialQuantity: ''
   });
-  const [editingId, setEditingId] = useState(null);
+  const [error, setError] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isEmployee, setIsEmployee] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  // Verificar roles del usuario
-  const isAdmin = keycloak.hasResourceRole('admin', 'inventory-app');
-  const isEmployee = keycloak.hasResourceRole('employee', 'inventory-app');
-
+  // Check roles and set up token refresh
   useEffect(() => {
-    if (initialized && keycloak.authenticated) {
-      fetchProducts();
-    }
-  }, [initialized, keycloak.authenticated]);
+    if (keycloak.authenticated) {
+      // Check roles using tokenParsed.roles
+      const adminRole = keycloak.tokenParsed?.roles?.includes('ROLE_ADMIN') || false;
+      const employeeRole = keycloak.tokenParsed?.roles?.includes('ROLE_EMPLOYEE') || false;
 
+      setIsAdmin(adminRole);
+      setIsEmployee(employeeRole);
+
+      console.log('User is authenticated:', keycloak.authenticated);
+      console.log('User has ROLE_ADMIN:', adminRole);
+      console.log('User has ROLE_EMPLOYEE:', employeeRole);
+      console.log('Token roles:', keycloak.tokenParsed?.roles);
+
+      // Set up token refresh every 30 seconds
+      const interval = setInterval(() => {
+        keycloak.updateToken(30).then((refreshed) => {
+          if (refreshed) {
+            console.log('Token refreshed:', keycloak.token);
+          }
+        }).catch(() => {
+          console.error('Failed to refresh token');
+          keycloak.login();
+        });
+      }, 30000);
+
+      fetchProducts();
+      return () => clearInterval(interval);
+    }
+  }, [keycloak]);
+
+  // Fetch all products (public endpoint)
   const fetchProducts = async () => {
     setIsLoading(true);
-    setError(null);
     try {
-      const response = await fetch('http://localhost:8080/api/products', {
-        headers: {
-          Authorization: keycloak.token ? `Bearer ${keycloak.token}` : undefined
-        }
+      const response = await axios.get('http://localhost:8080/api/products', {
+        headers: { Authorization: `Bearer ${keycloak.token}` }
       });
-      if (!response.ok) throw new Error('Error al cargar productos');
-      const data = await response.json();
-      setProducts(data);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      setError(error.message);
+      setProducts(response.data);
+      setError('');
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setError('Failed to fetch products');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSubmit = async (e) => {
+  // Create a new product (requires ROLE_ADMIN)
+  const createProduct = async (e) => {
     e.preventDefault();
     if (!isAdmin) {
-      setError('Solo los administradores pueden modificar productos');
+      setError('You need ROLE_ADMIN to create products');
       return;
     }
-    setIsLoading(true);
-    setError(null);
     try {
-      const url = editingId
-          ? `http://localhost:8080/api/products/${editingId}`
-          : 'http://localhost:8080/api/products';
-      const method = editingId ? 'PUT' : 'POST';
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${keycloak.token}`
-        },
-        body: JSON.stringify({
-          ...newProduct,
-          price: parseFloat(newProduct.price) || 0,
-          initialQuantity: parseInt(newProduct.initialQuantity, 10) || 0
-        })
+      await axios.post('http://localhost:8080/api/products', newProduct, {
+        headers: { Authorization: `Bearer ${keycloak.token}` }
       });
-      if (!response.ok) throw new Error(editingId ? 'Error al actualizar producto' : 'Error al crear producto');
-      fetchProducts();
       setNewProduct({ name: '', description: '', category: '', price: '', initialQuantity: '' });
-      setEditingId(null);
-    } catch (error) {
-      console.error('Error:', error);
-      setError(error.message);
-    } finally {
-      setIsLoading(false);
+      fetchProducts();
+      setError('');
+    } catch (err) {
+      console.error('Error creating product:', err);
+      setError('Failed to create product');
     }
   };
 
-  const handleDelete = async (id) => {
+  // Update a product (requires ROLE_ADMIN)
+  const updateProduct = async (id, updatedProduct) => {
     if (!isAdmin) {
-      setError('Solo los administradores pueden eliminar productos');
+      setError('You need ROLE_ADMIN to update products');
       return;
     }
-    if (!window.confirm('¿Estás seguro de eliminar este producto?')) return;
-    setIsLoading(true);
-    setError(null);
     try {
-      const response = await fetch(`http://localhost:8080/api/products/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${keycloak.token}`
-        }
+      await axios.put(`http://localhost:8080/api/products/${id}`, updatedProduct, {
+        headers: { Authorization: `Bearer ${keycloak.token}` }
       });
-      if (!response.ok) throw new Error('Error al eliminar producto');
       fetchProducts();
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      setError(error.message);
-    } finally {
-      setIsLoading(false);
+      setError('');
+    } catch (err) {
+      console.error('Error updating product:', err);
+      setError('Failed to update product');
     }
   };
 
-  const handleCancel = () => {
-    setNewProduct({ name: '', description: '', category: '', price: '', initialQuantity: '' });
-    setEditingId(null);
+  // Delete a product (requires ROLE_ADMIN)
+  const deleteProduct = async (id) => {
+    if (!isAdmin) {
+      setError('You need ROLE_ADMIN to delete products');
+      return;
+    }
+    try {
+      await axios.delete(`http://localhost:8080/api/products/${id}`, {
+        headers: { Authorization: `Bearer ${keycloak.token}` }
+      });
+      fetchProducts();
+      setError('');
+    } catch (err) {
+      console.error('Error deleting product:', err);
+      setError('Failed to delete product');
+    }
   };
 
+  // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setNewProduct({ ...newProduct, [name]: value });
   };
 
-  const handleEdit = (product) => {
-    if (!isAdmin && !isEmployee) {
-      setError('No tienes permisos para editar productos');
-      return;
-    }
-    setNewProduct({
-      name: product.name,
-      description: product.description,
-      category: product.category,
-      price: product.price.toString(),
-      initialQuantity: product.initialQuantity.toString()
-    });
-    setEditingId(product.id);
+  // Handle logout
+  const handleLogout = () => {
+    keycloak.logout();
   };
 
-  if (!initialized) {
-    return (
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Inicializando sistema de autenticación...</p>
-        </div>
-    );
-  }
-
-  if (!keycloak.authenticated) {
-    return (
-        <div className="login-container">
-          <div className="login-box">
-            <h1>Sistema de Gestión de Inventarios</h1>
-            <p>Por favor inicie sesión para acceder al sistema</p>
-            <button onClick={() => keycloak.login()} className="login-button">
-              Iniciar Sesión
-            </button>
-          </div>
-        </div>
-    );
-  }
+  // Calculate summary for non-admin users
+  const totalProducts = products.length;
+  const totalValue = products.reduce((sum, product) => sum + (product.price * product.initialQuantity), 0).toFixed(2);
 
   return (
       <div className="app-container">
         <header className="app-header">
-          <h1>Sistema de Gestión de Inventarios</h1>
+          <h1>Inventory Management System</h1>
           <div className="user-info">
-          <span>
-            Bienvenido, <strong>{keycloak.tokenParsed?.preferred_username || 'Usuario'}</strong>
-            {isAdmin && ' (Administrador)'}
-            {isEmployee && !isAdmin && ' (Empleado)'}
-          </span>
-            <button onClick={() => keycloak.logout()} className="logout-button">
-              Cerrar Sesión
-            </button>
+            <p>Welcome, {keycloak.tokenParsed?.preferred_username || 'User'}</p>
+            <button className="logout-button" onClick={handleLogout}>Logout</button>
           </div>
         </header>
+
         <main className="main-content">
-          {(isAdmin || isEmployee) && (
+          {error && <p className="error-message">{error}</p>}
+
+          {isAdmin && (
               <section className="product-form-section">
-                <h2>{editingId ? 'Editar Producto' : 'Agregar Nuevo Producto'}</h2>
-                <form onSubmit={handleSubmit} className="product-form">
+                <h2>Create New Product</h2>
+                <form className="product-form" onSubmit={createProduct}>
                   <div className="form-group">
-                    <label htmlFor="name">Nombre:</label>
+                    <label htmlFor="name">Name</label>
                     <input
                         type="text"
                         id="name"
                         name="name"
                         value={newProduct.name}
                         onChange={handleInputChange}
+                        placeholder="Product Name"
                         required
-                        disabled={!isAdmin && editingId === null}
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="description">Descripción:</label>
+                    <label htmlFor="description">Description</label>
                     <input
                         type="text"
                         id="description"
                         name="description"
                         value={newProduct.description}
                         onChange={handleInputChange}
+                        placeholder="Description"
                         required
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="category">Categoría:</label>
+                    <label htmlFor="category">Category</label>
                     <input
                         type="text"
                         id="category"
                         name="category"
                         value={newProduct.category}
                         onChange={handleInputChange}
+                        placeholder="Category"
                         required
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="price">Precio:</label>
+                    <label htmlFor="price">Price</label>
                     <input
                         type="number"
                         id="price"
                         name="price"
                         value={newProduct.price}
                         onChange={handleInputChange}
-                        min="0"
+                        placeholder="Price"
                         step="0.01"
                         required
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="initialQuantity">Cantidad:</label>
+                    <label htmlFor="initialQuantity">Quantity</label>
                     <input
                         type="number"
                         id="initialQuantity"
                         name="initialQuantity"
                         value={newProduct.initialQuantity}
                         onChange={handleInputChange}
-                        min="0"
+                        placeholder="Initial Quantity"
                         required
                     />
                   </div>
                   <div className="form-actions">
-                    <button type="submit" disabled={isLoading || (!isAdmin && editingId === null)}>
-                      {isLoading ? 'Procesando...' : (editingId ? 'Actualizar' : 'Agregar')}
+                    <button type="submit">Add Product</button>
+                    <button type="button" onClick={() => setNewProduct({ name: '', description: '', category: '', price: '', initialQuantity: '' })}>
+                      Clear
                     </button>
-                    {editingId && (
-                        <button type="button" onClick={handleCancel} disabled={isLoading}>
-                          Cancelar
-                        </button>
-                    )}
                   </div>
                 </form>
               </section>
           )}
-          {error && <div className="error-message">{error}</div>}
+
           <section className="product-list-section">
-            <h2>Listado de Productos</h2>
-            {isLoading && !products.length ? (
+            <h2>Products</h2>
+            {isEmployee && !isAdmin && (
+                <div className="product-summary">
+                  <p>Total Products: {totalProducts}</p>
+                  <p>Total Inventory Value: ${totalValue}</p>
+                </div>
+            )}
+            {isLoading ? (
                 <div className="loading-container">
                   <div className="loading-spinner"></div>
-                  <p>Cargando productos...</p>
+                  <p>Loading products...</p>
                 </div>
             ) : products.length === 0 ? (
-                <p>No hay productos registrados</p>
+                <p>No products available.</p>
             ) : (
                 <div className="product-table-container">
                   <table className="product-table">
                     <thead>
                     <tr>
-                      <th>Nombre</th>
-                      <th>Descripción</th>
-                      <th>Categoría</th>
-                      <th>Precio</th>
-                      <th>Cantidad</th>
-                      {(isAdmin || isEmployee) && <th>Acciones</th>}
+                      <th>Name</th>
+                      <th>Description</th>
+                      <th>Category</th>
+                      <th>Price</th>
+                      <th>Quantity</th>
+                      {isAdmin && <th>Actions</th>}
                     </tr>
                     </thead>
                     <tbody>
@@ -279,24 +260,27 @@ function App() {
                           <td>{product.category}</td>
                           <td>${product.price.toFixed(2)}</td>
                           <td>{product.initialQuantity}</td>
-                          {(isAdmin || isEmployee) && (
-                              <td className="actions">
-                                <button
-                                    onClick={() => handleEdit(product)}
-                                    className="edit-btn"
-                                    disabled={isLoading}
-                                >
-                                  Editar
-                                </button>
-                                {isAdmin && (
-                                    <button
-                                        onClick={() => handleDelete(product.id)}
-                                        className="delete-btn"
-                                        disabled={isLoading}
-                                    >
-                                      Eliminar
-                                    </button>
-                                )}
+                          {isAdmin && (
+                              <td>
+                                <div className="actions">
+                                  <button
+                                      className="edit-btn"
+                                      onClick={() => {
+                                        const newPrice = prompt('New price:', product.price);
+                                        if (newPrice && !isNaN(newPrice)) {
+                                          updateProduct(product.id, { ...product, price: parseFloat(newPrice) });
+                                        }
+                                      }}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                      className="delete-btn"
+                                      onClick={() => deleteProduct(product.id)}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
                               </td>
                           )}
                         </tr>
@@ -309,6 +293,6 @@ function App() {
         </main>
       </div>
   );
-}
+};
 
 export default App;
