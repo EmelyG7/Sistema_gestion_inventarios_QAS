@@ -350,7 +350,7 @@ class ProductServiceTest {
         when(productRepository.existsById(2L)).thenReturn(false);
 
         RuntimeException exception = assertThrows(RuntimeException.class, () -> productService.delete(2L));
-        assertEquals("Product not found", exception.getMessage());
+        assertEquals("Product not found with id: 2", exception.getMessage());
         verify(productRepository, times(1)).existsById(2L);
         verify(productRepository, never()).deleteById(2L);
     }

@@ -449,6 +449,37 @@ button:disabled {
   font-weight: bold;
 }
 
+/* Paginación */
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  gap: 5px;
+}
+
+.pagination button {
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  color: #333;
+}
+
+.pagination button:hover:not(:disabled) {
+  background-color: #e9ecef;
+}
+
+.pagination button.active {
+  background-color: #3498db;
+  color: white;
+  border-color: #3498db;
+}
+
+.pagination button:disabled {
+  background-color: #f8f9fa;
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .filters-panel {
@@ -457,6 +488,10 @@ button:disabled {
 
   .advanced-stats {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+
+  .pagination {
+    flex-wrap: wrap;
   }
 }
 
@@ -481,5 +516,10 @@ button:disabled {
 
   .stat-card p {
     font-size: 16px;
+  }
+
+  .pagination button {
+    padding: 6px 10px;
+    font-size: 12px;
   }
 }

@@ -80,8 +80,10 @@ test {
 }
 
 bootJar {
-    archiveFileName = 'app.jar'
-    mainClass = 'org.example.Main'
+    archiveFileName = 'app.jar' // Opcional: fuerza el nombre 'app.jar'
+    manifest {
+        attributes 'Start-Class': 'org.example.Main' // Necesario para Spring Boot
+    }
 }
 
 // Disable the default 'jar' task to avoid confusion

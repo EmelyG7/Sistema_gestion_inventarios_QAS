@@ -27,6 +27,10 @@ const App = ({ keycloak }) => {
   const [priceRange, setPriceRange] = useState([0, 10000]);
   const [stockFilter, setStockFilter] = useState('all');
 
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+
   useEffect(() => {
     if (keycloak.authenticated) {
       const adminRole = keycloak.tokenParsed?.roles?.includes('ROLE_ADMIN') || false;
@@ -48,6 +52,7 @@ const App = ({ keycloak }) => {
 
   useEffect(() => {
     applyFilters();
+    setCurrentPage(1); // Resetear a la primera página cuando cambian los filtros
   }, [products, searchTerm, categoryFilter, priceRange, stockFilter]);
 
   const fetchProducts = async () => {
@@ -75,8 +80,7 @@ const App = ({ keycloak }) => {
       result = result.filter(p =>
           p.name.toLowerCase().includes(term) ||
           p.description.toLowerCase().includes(term) ||
-          p.category.toLowerCase().includes(term)
-      );
+          p.category.toLowerCase().includes(term))
     }
 
     // Filtro por categoría
@@ -100,6 +104,14 @@ const App = ({ keycloak }) => {
 
     setFilteredProducts(result);
   };
+
+  // Lógica de paginación
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -455,52 +467,81 @@ const App = ({ keycloak }) => {
             ) : filteredProducts.length === 0 ? (
                 <p>No products match your filters.</p>
             ) : (
-                <div className="product-table-container">
-                  <table className="product-table">
-                    <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Description</th>
-                      <th>Category</th>
-                      <th>Price</th>
-                      <th>Quantity</th>
-                      {isAdmin && <th>Actions</th>}
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {filteredProducts.map((product) => (
-                        <tr key={product.id}>
-                          <td>{product.name}</td>
-                          <td>{product.description}</td>
-                          <td>{product.category}</td>
-                          <td>${product.price.toFixed(2)}</td>
-                          <td className={product.initialQuantity < 5 ? 'low-stock' : ''}>
-                            {product.initialQuantity}
-                            {product.initialQuantity < 5 && <span className="stock-warning">!</span>}
-                          </td>
-                          {isAdmin && (
-                              <td>
-                                <div className="actions">
-                                  <button
-                                      className="edit-btn"
-                                      onClick={() => openEditModal(product)}
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                      className="delete-btn"
-                                      onClick={() => deleteProduct(product.id)}
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </td>
-                          )}
-                        </tr>
+                <>
+                  <div className="product-table-container">
+                    <table className="product-table">
+                      <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>Price</th>
+                        <th>Quantity</th>
+                        {isAdmin && <th>Actions</th>}
+                      </tr>
+                      </thead>
+                      <tbody>
+                      {currentItems.map((product) => (
+                          <tr key={product.id}>
+                            <td>{product.name}</td>
+                            <td>{product.description}</td>
+                            <td>{product.category}</td>
+                            <td>${product.price.toFixed(2)}</td>
+                            <td className={product.initialQuantity < 5 ? 'low-stock' : ''}>
+                              {product.initialQuantity}
+                              {product.initialQuantity < 5 && <span className="stock-warning">!</span>}
+                            </td>
+                            {isAdmin && (
+                                <td>
+                                  <div className="actions">
+                                    <button
+                                        className="edit-btn"
+                                        onClick={() => openEditModal(product)}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                        className="delete-btn"
+                                        onClick={() => deleteProduct(product.id)}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </td>
+                            )}
+                          </tr>
+                      ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Paginación */}
+                  <div className="pagination">
+                    <button
+                        onClick={() => paginate(currentPage - 1)}
+                        disabled={currentPage === 1}
+                    >
+                      Previous
+                    </button>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(number => (
+                        <button
+                            key={number}
+                            onClick={() => paginate(number)}
+                            className={currentPage === number ? 'active' : ''}
+                        >
+                          {number}
+                        </button>
                     ))}
-                    </tbody>
-                  </table>
-                </div>
+
+                    <button
+                        onClick={() => paginate(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </>
             )}
           </section>
         </main>
