@@ -4,7 +4,6 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/Sistema_gestion_inventarios_QAS.iml" filepath="$PROJECT_DIR$/.idea/Sistema_gestion_inventarios_QAS.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/sistema_gestion_intventarios.main.iml" filepath="$PROJECT_DIR$/.idea/modules/sistema_gestion_intventarios.main.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/sistema_gestion_intventarios.test.iml" filepath="$PROJECT_DIR$/.idea/modules/sistema_gestion_intventarios.test.iml" />
     </modules>
   </component>
 </project>
