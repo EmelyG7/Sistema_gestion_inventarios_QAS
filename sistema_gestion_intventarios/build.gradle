@@ -56,12 +56,20 @@ dependencies {
     testImplementation 'org.seleniumhq.selenium:selenium-java:4.25.0'
     testImplementation 'commons-io:commons-io:2.15.0'
 
+    testImplementation 'org.mockito:mockito-core:5.14.2'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2'
+    testImplementation 'net.bytebuddy:byte-buddy-agent:1.17.6'
+
 }
 
 test {
     useJUnitPlatform()
     systemProperty 'cucumber.junit-platform.naming-strategy', 'long'
     systemProperty 'spring.profiles.active', 'test'
+    jvmArgs "-javaagent:${configurations.testRuntimeClasspath.find { it.name.contains('byte-buddy-agent') }.absolutePath}"
+    filter {
+        includeTestsMatching "*"
+    }
     failFast = true
     testLogging {
         events 'passed', 'skipped', 'failed'
@@ -72,6 +80,12 @@ test {
 
 bootJar {
     archiveFileName = 'app.jar'
+    mainClass = 'org.example.Main'
+}
+
+// Disable the default 'jar' task to avoid confusion
+jar {
+    enabled = false
 }
 
 tasks.withType(JavaCompile) {
