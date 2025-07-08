@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import Modal from './Modal';
 import './App.css';
 
 const App = ({ keycloak }) => {
   const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
+  const [editingProduct, setEditingProduct] = useState(null);
   const [newProduct, setNewProduct] = useState({
     name: '',
     description: '',
@@ -11,36 +14,31 @@ const App = ({ keycloak }) => {
     price: '',
     initialQuantity: ''
   });
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [error, setError] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEmployee, setIsEmployee] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Check roles and set up token refresh
+  // Filtros y búsqueda
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [priceRange, setPriceRange] = useState([0, 10000]);
+  const [stockFilter, setStockFilter] = useState('all');
+
   useEffect(() => {
     if (keycloak.authenticated) {
-      // Check roles using tokenParsed.roles
       const adminRole = keycloak.tokenParsed?.roles?.includes('ROLE_ADMIN') || false;
       const employeeRole = keycloak.tokenParsed?.roles?.includes('ROLE_EMPLOYEE') || false;
 
       setIsAdmin(adminRole);
       setIsEmployee(employeeRole);
 
-      console.log('User is authenticated:', keycloak.authenticated);
-      console.log('User has ROLE_ADMIN:', adminRole);
-      console.log('User has ROLE_EMPLOYEE:', employeeRole);
-      console.log('Token roles:', keycloak.tokenParsed?.roles);
-
-      // Set up token refresh every 30 seconds
       const interval = setInterval(() => {
         keycloak.updateToken(30).then((refreshed) => {
-          if (refreshed) {
-            console.log('Token refreshed:', keycloak.token);
-          }
-        }).catch(() => {
-          console.error('Failed to refresh token');
-          keycloak.login();
-        });
+          if (refreshed) console.log('Token refreshed');
+        }).catch(() => keycloak.login());
       }, 30000);
 
       fetchProducts();
@@ -48,7 +46,10 @@ const App = ({ keycloak }) => {
     }
   }, [keycloak]);
 
-  // Fetch all products (public endpoint)
+  useEffect(() => {
+    applyFilters();
+  }, [products, searchTerm, categoryFilter, priceRange, stockFilter]);
+
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
@@ -65,180 +66,394 @@ const App = ({ keycloak }) => {
     }
   };
 
-  // Create a new product (requires ROLE_ADMIN)
-  const createProduct = async (e) => {
+  const applyFilters = () => {
+    let result = [...products];
+
+    // Filtro por búsqueda
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(p =>
+          p.name.toLowerCase().includes(term) ||
+          p.description.toLowerCase().includes(term) ||
+          p.category.toLowerCase().includes(term)
+      );
+    }
+
+    // Filtro por categoría
+    if (categoryFilter !== 'all') {
+      result = result.filter(p => p.category === categoryFilter);
+    }
+
+    // Filtro por rango de precio
+    result = result.filter(p =>
+        p.price >= priceRange[0] && p.price <= priceRange[1]
+    );
+
+    // Filtro por stock
+    if (stockFilter === 'low') {
+      result = result.filter(p => p.initialQuantity < 10);
+    } else if (stockFilter === 'out') {
+      result = result.filter(p => p.initialQuantity === 0);
+    } else if (stockFilter === 'in') {
+      result = result.filter(p => p.initialQuantity > 0);
+    }
+
+    setFilteredProducts(result);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    if (isEditModalOpen) {
+      setEditingProduct({ ...editingProduct, [name]: value });
+    } else {
+      setNewProduct({ ...newProduct, [name]: value });
+    }
+  };
+
+  const handleCreateSubmit = async (e) => {
     e.preventDefault();
     if (!isAdmin) {
       setError('You need ROLE_ADMIN to create products');
       return;
     }
     try {
-      await axios.post('http://localhost:8080/api/products', newProduct, {
+      await axios.post('http://localhost:8080/api/products', {
+        ...newProduct,
+        price: parseFloat(newProduct.price),
+        initialQuantity: parseInt(newProduct.initialQuantity, 10)
+      }, {
         headers: { Authorization: `Bearer ${keycloak.token}` }
       });
       setNewProduct({ name: '', description: '', category: '', price: '', initialQuantity: '' });
+      setIsCreateModalOpen(false);
       fetchProducts();
       setError('');
     } catch (err) {
       console.error('Error creating product:', err);
-      setError('Failed to create product');
+      setError(err.response?.data?.message || 'Failed to create product');
     }
   };
 
-  // Update a product (requires ROLE_ADMIN)
-  const updateProduct = async (id, updatedProduct) => {
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
     if (!isAdmin) {
-      setError('You need ROLE_ADMIN to update products');
+      setError('You need ROLE_ADMIN to edit products');
       return;
     }
     try {
-      await axios.put(`http://localhost:8080/api/products/${id}`, updatedProduct, {
+      await axios.put(`http://localhost:8080/api/products/${editingProduct.id}`, {
+        ...editingProduct,
+        price: parseFloat(editingProduct.price),
+        initialQuantity: parseInt(editingProduct.initialQuantity, 10)
+      }, {
         headers: { Authorization: `Bearer ${keycloak.token}` }
       });
+      setIsEditModalOpen(false);
       fetchProducts();
       setError('');
     } catch (err) {
       console.error('Error updating product:', err);
-      setError('Failed to update product');
+      setError(err.response?.data?.message || 'Failed to update product');
     }
   };
 
-  // Delete a product (requires ROLE_ADMIN)
   const deleteProduct = async (id) => {
     if (!isAdmin) {
       setError('You need ROLE_ADMIN to delete products');
       return;
     }
-    try {
-      await axios.delete(`http://localhost:8080/api/products/${id}`, {
-        headers: { Authorization: `Bearer ${keycloak.token}` }
-      });
-      fetchProducts();
-      setError('');
-    } catch (err) {
-      console.error('Error deleting product:', err);
-      setError('Failed to delete product');
+    if (window.confirm('Are you sure you want to delete this product?')) {
+      try {
+        await axios.delete(`http://localhost:8080/api/products/${id}`, {
+          headers: { Authorization: `Bearer ${keycloak.token}` }
+        });
+        fetchProducts();
+        setError('');
+      } catch (err) {
+        console.error('Error deleting product:', err);
+        setError('Failed to delete product');
+      }
     }
   };
 
-  // Handle form input changes
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setNewProduct({ ...newProduct, [name]: value });
+  const openEditModal = (product) => {
+    setEditingProduct({ ...product });
+    setIsEditModalOpen(true);
   };
 
-  // Handle logout
-  const handleLogout = () => {
-    keycloak.logout();
-  };
-
-  // Calculate summary for non-admin users
-  const totalProducts = products.length;
-  const totalValue = products.reduce((sum, product) => sum + (product.price * product.initialQuantity), 0).toFixed(2);
+  // Estadísticas avanzadas
+  const totalProducts = filteredProducts.length;
+  const totalValue = filteredProducts.reduce((sum, product) => sum + (product.price * product.initialQuantity), 0).toFixed(2);
+  const categories = [...new Set(products.map(p => p.category))];
+  const lowStockProducts = products.filter(p => p.initialQuantity < 10).length;
+  const outOfStockProducts = products.filter(p => p.initialQuantity === 0).length;
+  const averagePrice = (filteredProducts.reduce((sum, p) => sum + p.price, 0) / (filteredProducts.length || 1)).toFixed(2);
+  const maxPriceProduct = filteredProducts.length > 0 ?
+      filteredProducts.reduce((max, p) => p.price > max.price ? p : max) : null;
+  const minPriceProduct = filteredProducts.length > 0 ?
+      filteredProducts.reduce((min, p) => p.price < min.price ? p : min) : null;
 
   return (
       <div className="app-container">
         <header className="app-header">
           <h1>Inventory Management System</h1>
           <div className="user-info">
-            <p>Welcome, {keycloak.tokenParsed?.preferred_username || 'User'}</p>
-            <button className="logout-button" onClick={handleLogout}>Logout</button>
+            <span>Welcome, <strong>{keycloak.tokenParsed?.preferred_username || 'User'}</strong></span>
+            <button className="logout-button" onClick={() => keycloak.logout()}>
+              Logout
+            </button>
           </div>
         </header>
 
         <main className="main-content">
-          {error && <p className="error-message">{error}</p>}
+          {error && <div className="error-message">{error}</div>}
 
           {isAdmin && (
-              <section className="product-form-section">
-                <h2>Create New Product</h2>
-                <form className="product-form" onSubmit={createProduct}>
+              <button className="add-product-button" onClick={() => setIsCreateModalOpen(true)}>
+                + Add New Product
+              </button>
+          )}
+
+          {/* Panel de filtros y búsqueda */}
+          <div className="filters-panel">
+            <div className="search-box">
+              <input
+                  type="text"
+                  placeholder="Search by name, description or category"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <button className="search-button">
+                <i className="search-icon">🔍</i>
+              </button>
+            </div>
+
+            <div className="filter-group">
+              <label>Category:</label>
+              <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+              >
+                <option value="all">All Categories</option>
+                {categories.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label>Price Range:</label>
+              <div className="price-range">
+                <input
+                    type="number"
+                    value={priceRange[0]}
+                    onChange={(e) => setPriceRange([parseFloat(e.target.value) || 0, priceRange[1]])}
+                    min="0"
+                />
+                <span>to</span>
+                <input
+                    type="number"
+                    value={priceRange[1]}
+                    onChange={(e) => setPriceRange([priceRange[0], parseFloat(e.target.value) || 10000])}
+                    min={priceRange[0]}
+                />
+              </div>
+            </div>
+
+            <div className="filter-group">
+              <label>Stock Status:</label>
+              <select
+                  value={stockFilter}
+                  onChange={(e) => setStockFilter(e.target.value)}
+              >
+                <option value="all">All</option>
+                <option value="low">Low Stock (&lt;10)</option>
+                <option value="out">Out of Stock</option>
+                <option value="in">In Stock</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Estadísticas avanzadas */}
+          <div className="advanced-stats">
+            <div className="stat-card">
+              <h3>Total Products</h3>
+              <p>{totalProducts}</p>
+            </div>
+            <div className="stat-card">
+              <h3>Total Inventory Value</h3>
+              <p>${totalValue}</p>
+            </div>
+            <div className="stat-card">
+              <h3>Average Price</h3>
+              <p>${averagePrice}</p>
+            </div>
+            <div className="stat-card">
+              <h3>Low Stock Items</h3>
+              <p>{lowStockProducts}</p>
+            </div>
+            <div className="stat-card">
+              <h3>Out of Stock</h3>
+              <p>{outOfStockProducts}</p>
+            </div>
+            {maxPriceProduct && (
+                <div className="stat-card">
+                  <h3>Highest Priced</h3>
+                  <p>{maxPriceProduct.name} (${maxPriceProduct.price})</p>
+                </div>
+            )}
+            {minPriceProduct && (
+                <div className="stat-card">
+                  <h3>Lowest Priced</h3>
+                  <p>{minPriceProduct.name} (${minPriceProduct.price})</p>
+                </div>
+            )}
+          </div>
+
+          {/* Modal para crear producto */}
+          <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)}>
+            <h2>Create New Product</h2>
+            <form className="modal-form" onSubmit={handleCreateSubmit}>
+              <div className="form-group">
+                <label>Name</label>
+                <input
+                    type="text"
+                    name="name"
+                    value={newProduct.name}
+                    onChange={handleInputChange}
+                    required
+                />
+              </div>
+              <div className="form-group">
+                <label>Description</label>
+                <input
+                    type="text"
+                    name="description"
+                    value={newProduct.description}
+                    onChange={handleInputChange}
+                    required
+                />
+              </div>
+              <div className="form-group">
+                <label>Category</label>
+                <input
+                    type="text"
+                    name="category"
+                    value={newProduct.category}
+                    onChange={handleInputChange}
+                    required
+                />
+              </div>
+              <div className="form-group">
+                <label>Price</label>
+                <input
+                    type="number"
+                    name="price"
+                    value={newProduct.price}
+                    onChange={handleInputChange}
+                    step="0.01"
+                    min="0"
+                    required
+                />
+              </div>
+              <div className="form-group">
+                <label>Initial Quantity</label>
+                <input
+                    type="number"
+                    name="initialQuantity"
+                    value={newProduct.initialQuantity}
+                    onChange={handleInputChange}
+                    min="0"
+                    required
+                />
+              </div>
+              <div className="form-actions">
+                <button type="submit">Create Product</button>
+                <button type="button" onClick={() => setIsCreateModalOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </Modal>
+
+          {/* Modal para editar producto */}
+          <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)}>
+            <h2>Edit Product</h2>
+            {editingProduct && (
+                <form className="modal-form" onSubmit={handleEditSubmit}>
                   <div className="form-group">
-                    <label htmlFor="name">Name</label>
+                    <label>Name</label>
                     <input
                         type="text"
-                        id="name"
                         name="name"
-                        value={newProduct.name}
+                        value={editingProduct.name}
                         onChange={handleInputChange}
-                        placeholder="Product Name"
                         required
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="description">Description</label>
+                    <label>Description</label>
                     <input
                         type="text"
-                        id="description"
                         name="description"
-                        value={newProduct.description}
+                        value={editingProduct.description}
                         onChange={handleInputChange}
-                        placeholder="Description"
                         required
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="category">Category</label>
+                    <label>Category</label>
                     <input
                         type="text"
-                        id="category"
                         name="category"
-                        value={newProduct.category}
+                        value={editingProduct.category}
                         onChange={handleInputChange}
-                        placeholder="Category"
                         required
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="price">Price</label>
+                    <label>Price</label>
                     <input
                         type="number"
-                        id="price"
                         name="price"
-                        value={newProduct.price}
+                        value={editingProduct.price}
                         onChange={handleInputChange}
-                        placeholder="Price"
                         step="0.01"
+                        min="0"
                         required
                     />
                   </div>
                   <div className="form-group">
-                    <label htmlFor="initialQuantity">Quantity</label>
+                    <label>Quantity</label>
                     <input
                         type="number"
-                        id="initialQuantity"
                         name="initialQuantity"
-                        value={newProduct.initialQuantity}
+                        value={editingProduct.initialQuantity}
                         onChange={handleInputChange}
-                        placeholder="Initial Quantity"
+                        min="0"
                         required
                     />
                   </div>
                   <div className="form-actions">
-                    <button type="submit">Add Product</button>
-                    <button type="button" onClick={() => setNewProduct({ name: '', description: '', category: '', price: '', initialQuantity: '' })}>
-                      Clear
+                    <button type="submit">Update Product</button>
+                    <button type="button" onClick={() => setIsEditModalOpen(false)}>
+                      Cancel
                     </button>
                   </div>
                 </form>
-              </section>
-          )}
-
-          <section className="product-list-section">
-            <h2>Products</h2>
-            {isEmployee && !isAdmin && (
-                <div className="product-summary">
-                  <p>Total Products: {totalProducts}</p>
-                  <p>Total Inventory Value: ${totalValue}</p>
-                </div>
             )}
+          </Modal>
+
+          {/* Lista de productos filtrados */}
+          <section className="product-list-section">
+            <h2>Product List ({filteredProducts.length} items)</h2>
             {isLoading ? (
                 <div className="loading-container">
                   <div className="loading-spinner"></div>
                   <p>Loading products...</p>
                 </div>
-            ) : products.length === 0 ? (
-                <p>No products available.</p>
+            ) : filteredProducts.length === 0 ? (
+                <p>No products match your filters.</p>
             ) : (
                 <div className="product-table-container">
                   <table className="product-table">
@@ -253,24 +468,22 @@ const App = ({ keycloak }) => {
                     </tr>
                     </thead>
                     <tbody>
-                    {products.map((product) => (
+                    {filteredProducts.map((product) => (
                         <tr key={product.id}>
                           <td>{product.name}</td>
                           <td>{product.description}</td>
                           <td>{product.category}</td>
                           <td>${product.price.toFixed(2)}</td>
-                          <td>{product.initialQuantity}</td>
+                          <td className={product.initialQuantity < 5 ? 'low-stock' : ''}>
+                            {product.initialQuantity}
+                            {product.initialQuantity < 5 && <span className="stock-warning">!</span>}
+                          </td>
                           {isAdmin && (
                               <td>
                                 <div className="actions">
                                   <button
                                       className="edit-btn"
-                                      onClick={() => {
-                                        const newPrice = prompt('New price:', product.price);
-                                        if (newPrice && !isNaN(newPrice)) {
-                                          updateProduct(product.id, { ...product, price: parseFloat(newPrice) });
-                                        }
-                                      }}
+                                      onClick={() => openEditModal(product)}
                                   >
                                     Edit
                                   </button>
