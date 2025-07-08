@@ -1,4 +1,4 @@
-package com.inventory.cucumber;
+package com.inventory.cucumber.config;
 
 import org.example.Main;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -7,6 +7,9 @@ import org.springframework.test.context.ActiveProfiles;
 
 @CucumberContextConfiguration
 @ActiveProfiles("test")
-@SpringBootTest(classes = Main.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+        classes = Main.class,
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
+)
 public class CucumberSpringConfiguration {
 }

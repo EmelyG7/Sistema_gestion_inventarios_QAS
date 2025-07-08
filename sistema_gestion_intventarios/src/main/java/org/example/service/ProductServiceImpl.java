@@ -3,11 +3,13 @@ package org.example.service;
 import org.example.entity.Product;
 import org.example.repository.ProductRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 @Service
+@Transactional
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository repository;
@@ -53,9 +55,10 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public void delete(Long id) {
         if (!repository.existsById(id)) {
-            throw new RuntimeException("Product not found");
+            throw new RuntimeException("Product not found with id: " + id);
         }
         repository.deleteById(id);
+        repository.flush();
     }
 
     @Override

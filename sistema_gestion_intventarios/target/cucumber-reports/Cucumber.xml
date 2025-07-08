@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Cucumber" time="12.286" tests="6" skipped="0" failures="0" errors="0" timestamp="2025-07-08T21:17:35.733034400Z">
+<testcase classname="Product Management API" name="Get all products" time="0.717">
+<system-out><![CDATA[
+Given the system has the following products:................................passed
+When I send a GET request to "/api/products"................................passed
+Then I should receive status 200............................................passed
+And the response should contain 2 products..................................passed
+And the response should contain product "Laptop HP".........................passed
+And the response should contain product "Mouse Logi"........................passed
+]]></system-out>
+</testcase>
+<testcase classname="Product Management API" name="Get product by ID" time="0.661">
+<system-out><![CDATA[
+Given the system has the following products:................................passed
+When I send a GET request to "/api/products"................................passed
+Then I should receive status 200............................................passed
+And the response should contain product "Laptop HP".........................passed
+]]></system-out>
+</testcase>
+<testcase classname="Product Management API" name="Create a new product" time="0.062">
+<system-out><![CDATA[
+Given the system has the following products:................................passed
+When I send a POST request to "/api/products" with:.........................passed
+Then I should receive status 200............................................passed
+And the product "MacBook Pro" should exist in the system....................passed
+And the product "MacBook Pro" should have quantity 5........................passed
+]]></system-out>
+</testcase>
+<testcase classname="Product Management API" name="Update an existing product" time="0.098">
+<system-out><![CDATA[
+Given the system has the following products:................................passed
+When I send a PUT request to "/api/products" with:..........................passed
+Then I should receive status 200............................................passed
+And the product "Laptop HP" should have description "Gaming laptop".........passed
+And the product "Laptop HP" should have price 1500..........................passed
+]]></system-out>
+</testcase>
+<testcase classname="Product Management API" name="Delete a product" time="0.561">
+<system-out><![CDATA[
+Given the system has the following products:................................passed
+When I send a DELETE request for product "Mouse Logi".......................passed
+Then I should receive status 200............................................passed
+And the product "Mouse Logi" should not exist in the system.................passed
+]]></system-out>
+</testcase>
+<testcase classname="Product Management API" name="Calculate inventory totals" time="0.051">
+<system-out><![CDATA[
+Given the system has the following products:................................passed
+When I send a GET request to "/api/products"................................passed
+Then I should receive status 200............................................passed
+And the total inventory value should be 13250...............................passed
+]]></system-out>
+</testcase>
+</testsuite>
