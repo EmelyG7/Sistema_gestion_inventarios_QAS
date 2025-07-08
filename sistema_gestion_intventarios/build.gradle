@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.2'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.flywaydb.flyway' version '10.20.1' // Add Flyway plugin
 }
 
 group = 'org.example'
@@ -14,8 +15,6 @@ java {
 
 repositories {
     mavenCentral()
-    maven { url 'https://repo1.maven.org/maven2' } // Optional: Explicitly include Maven Central
-    maven { url 'https://nexus.keycloak.org/nexus/content/repositories/releases' } // Keycloak repository
 }
 
 dependencies {
@@ -28,6 +27,9 @@ dependencies {
 
     // PostgreSQL
     runtimeOnly 'org.postgresql:postgresql'
+
+    //H2 for testing
+    testImplementation 'com.h2database:h2'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok:1.18.34'
@@ -43,24 +45,35 @@ dependencies {
 
     testImplementation platform('org.junit:junit-bom:5.9.1')
     testImplementation 'org.junit.jupiter:junit-jupiter'
-
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'io.cucumber:cucumber-java:7.15.0'
-    testImplementation 'io.cucumber:cucumber-junit:7.15.0'
-    testImplementation 'io.cucumber:cucumber-spring:7.15.0'
-    testImplementation 'org.junit.vintage:junit-vintage-engine'
+    testImplementation 'io.cucumber:cucumber-java:7.18.1'
+    testImplementation 'io.cucumber:cucumber-junit:7.18.1'
+    testImplementation 'io.cucumber:cucumber-spring:7.18.1'
+//    testImplementation 'org.junit.vintage:junit-vintage-engine'
     testImplementation 'com.jayway.jsonpath:json-path:2.9.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
-    testImplementation 'com.h2database:h2'
+//    testImplementation 'org.selenium:selenium-java:4.25.0'
+    testImplementation 'org.seleniumhq.selenium:selenium-java:4.25.0'
+    testImplementation 'commons-io:commons-io:2.15.0'
 
-
-//    implementation 'org.keycloak:keycloak-spring-boot-starter:26.3.0'
 }
 
 test {
     useJUnitPlatform()
+    systemProperty 'cucumber.junit-platform.naming-strategy', 'long'
+    systemProperty 'spring.profiles.active', 'test'
+    failFast = true
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        showStandardStreams = true
+        exceptionFormat 'full'
+    }
 }
 
 bootJar {
     archiveFileName = 'app.jar'
+}
+
+tasks.withType(JavaCompile) {
+    options.compilerArgs << '-Xlint:deprecation'
 }

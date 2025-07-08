@@ -6,7 +6,7 @@ import org.junit.runner.RunWith;
 
 @RunWith(Cucumber.class)
 @CucumberOptions(
-        features = "src/test/resources/features",
+        features = "src/test/resources/features/product",
         glue = {
                 "com.inventory.cucumber.steps",
                 "com.inventory.cucumber" // Para encontrar la clase de configuración
@@ -17,6 +17,8 @@ import org.junit.runner.RunWith;
                 "json:target/cucumber-reports/cucumber.json"
         },
         monochrome = true
+        //,
+//        tags = "@Frontend or @Backend" // Adjust if using specific tags
 )
 public class CucumberTestRunner {
 }
