@@ -14,18 +14,43 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  app:
-    build: .
-    container_name: springboot_inventory
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.4
+    container_name: keycloak
+    command: start-dev
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/inventorydb
+      KC_DB_USERNAME: inventoryuser
+      KC_DB_PASSWORD: inventorypass
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8180:8080"
     depends_on:
       - postgres
-    ports:
-      - "8080:8080"
+
+  app:
+    build: ./backend
+    container_name: springboot_inventory
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/inventorydb
       - SPRING_DATASOURCE_USERNAME=inventoryuser
       - SPRING_DATASOURCE_PASSWORD=inventorypass
-    restart: on-failure
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://keycloak:8080/realms/inventory-realm
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - keycloak
+
+  frontend:
+      build: ./frontend
+      container_name: react_inventory
+      ports:
+        - "3000:80"
+      depends_on:
+        - app
 
 volumes:
   postgres_data:
