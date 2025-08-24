@@ -1,5 +1,6 @@
 package com.inventory.service;
 
+import org.example.dto.ProductDTO;
 import org.example.entity.Product;
 import org.example.repository.ProductRepository;
 import org.example.service.ProductServiceImpl;
@@ -19,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+//TODO : Rehacer tests con los métodos de la nueva api y agregar tests de lógica de negocios
 @ExtendWith(MockitoExtension.class)
 class ProductServiceTest {
 
@@ -45,7 +47,7 @@ class ProductServiceTest {
     void save_savesAndReturnsProduct() {
         when(productRepository.save(any(Product.class))).thenReturn(product);
 
-        Product savedProduct = productService.save(product);
+        Product savedProduct = productService.saveLegacy(product);
 
         assertNotNull(savedProduct);
         assertEquals("Laptop HP", savedProduct.getName());
@@ -56,7 +58,7 @@ class ProductServiceTest {
 
     @Test
     void save_throwsExceptionForNullProduct() {
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.save(null));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.saveLegacy(null));
         assertEquals("Product cannot be null", exception.getMessage());
         verify(productRepository, never()).save(any(Product.class));
     }
@@ -70,7 +72,7 @@ class ProductServiceTest {
         invalidProduct.setPrice(BigDecimal.valueOf(-10));
         invalidProduct.setInitialQuantity(10);
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.save(invalidProduct));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.saveLegacy(invalidProduct));
         assertEquals("Price must be positive", exception.getMessage());
         verify(productRepository, never()).save(any(Product.class));
     }
@@ -84,7 +86,7 @@ class ProductServiceTest {
         invalidProduct.setPrice(BigDecimal.valueOf(999.99));
         invalidProduct.setInitialQuantity(-5);
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.save(invalidProduct));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.saveLegacy(invalidProduct));
         assertEquals("Quantity must be non-negative", exception.getMessage());
         verify(productRepository, never()).save(any(Product.class));
     }
@@ -98,7 +100,7 @@ class ProductServiceTest {
         invalidProduct.setPrice(BigDecimal.valueOf(999.99));
         invalidProduct.setInitialQuantity(10);
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.save(invalidProduct));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.saveLegacy(invalidProduct));
         assertEquals("Name cannot be empty", exception.getMessage());
         verify(productRepository, never()).save(any(Product.class));
     }
@@ -112,7 +114,7 @@ class ProductServiceTest {
         invalidProduct.setPrice(BigDecimal.valueOf(999.99));
         invalidProduct.setInitialQuantity(10);
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.save(invalidProduct));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.saveLegacy(invalidProduct));
         assertEquals("Name cannot be empty", exception.getMessage());
         verify(productRepository, never()).save(any(Product.class));
     }
@@ -128,7 +130,7 @@ class ProductServiceTest {
 
         when(productRepository.save(any(Product.class))).thenReturn(validProduct);
 
-        Product savedProduct = productService.save(validProduct);
+        Product savedProduct = productService.saveLegacy(validProduct);
 
         assertNotNull(savedProduct);
         assertEquals(0, savedProduct.getInitialQuantity());
@@ -144,7 +146,7 @@ class ProductServiceTest {
         invalidProduct.setPrice(BigDecimal.ZERO);
         invalidProduct.setInitialQuantity(10);
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.save(invalidProduct));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.saveLegacy(invalidProduct));
         assertEquals("Price must be positive", exception.getMessage());
         verify(productRepository, never()).save(any(Product.class));
     }
@@ -160,7 +162,7 @@ class ProductServiceTest {
 
         when(productRepository.save(any(Product.class))).thenReturn(validProduct);
 
-        Product savedProduct = productService.save(validProduct);
+        Product savedProduct = productService.saveLegacy(validProduct);
 
         assertNotNull(savedProduct);
         assertNull(savedProduct.getCategory());
@@ -221,7 +223,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
         when(productRepository.save(any(Product.class))).thenReturn(updatedProduct);
 
-        Product result = productService.update(1L, updatedProduct);
+        Product result = productService.updateLegacy(1L, updatedProduct);
 
         assertEquals("Updated description", result.getDescription());
         assertEquals(0, BigDecimal.valueOf(1099.99).compareTo(result.getPrice()));
@@ -242,7 +244,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
         when(productRepository.save(any(Product.class))).thenReturn(updatedProduct);
 
-        Product result = productService.update(1L, updatedProduct);
+        Product result = productService.updateLegacy(1L, updatedProduct);
 
         assertEquals("New description", result.getDescription());
         assertEquals(0, BigDecimal.valueOf(999.99).compareTo(result.getPrice()));
@@ -255,7 +257,7 @@ class ProductServiceTest {
     void update_throwsExceptionForInvalidId() {
         when(productRepository.findById(2L)).thenReturn(Optional.empty());
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> productService.update(2L, product));
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> productService.updateLegacy(2L, product));
         assertEquals("Product not found", exception.getMessage());
         verify(productRepository, times(1)).findById(2L);
         verify(productRepository, never()).save(any(Product.class));
@@ -263,7 +265,7 @@ class ProductServiceTest {
 
     @Test
     void update_throwsExceptionForNullProduct() {
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.update(1L, null));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.updateLegacy(1L, null));
         assertEquals("Product cannot be null", exception.getMessage());
         verify(productRepository, never()).findById(anyLong());
         verify(productRepository, never()).save(any(Product.class));
@@ -278,7 +280,7 @@ class ProductServiceTest {
         invalidProduct.setPrice(BigDecimal.valueOf(-10));
         invalidProduct.setInitialQuantity(15);
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.update(1L, invalidProduct));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.updateLegacy(1L, invalidProduct));
         assertEquals("Price must be positive", exception.getMessage());
         verify(productRepository, never()).findById(anyLong());
         verify(productRepository, never()).save(any(Product.class));
@@ -293,7 +295,7 @@ class ProductServiceTest {
         invalidProduct.setPrice(BigDecimal.valueOf(1099.99));
         invalidProduct.setInitialQuantity(15);
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.update(1L, invalidProduct));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.updateLegacy(1L, invalidProduct));
         assertEquals("Name cannot be empty", exception.getMessage());
         verify(productRepository, never()).findById(anyLong());
         verify(productRepository, never()).save(any(Product.class));
@@ -308,7 +310,7 @@ class ProductServiceTest {
         invalidProduct.setPrice(BigDecimal.ZERO);
         invalidProduct.setInitialQuantity(15);
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.update(1L, invalidProduct));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> productService.updateLegacy(1L, invalidProduct));
         assertEquals("Price must be positive", exception.getMessage());
         verify(productRepository, never()).findById(anyLong());
         verify(productRepository, never()).save(any(Product.class));
@@ -326,7 +328,7 @@ class ProductServiceTest {
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
         when(productRepository.save(any(Product.class))).thenReturn(updatedProduct);
 
-        Product result = productService.update(1L, updatedProduct);
+        Product result = productService.updateLegacy(1L, updatedProduct);
 
         assertNull(result.getCategory());
         assertEquals("Updated description", result.getDescription());
@@ -339,7 +341,7 @@ class ProductServiceTest {
         when(productRepository.existsById(1L)).thenReturn(true);
         doNothing().when(productRepository).deleteById(1L);
 
-        productService.delete(1L);
+        productService.deleteProduct(1L);
 
         verify(productRepository, times(1)).existsById(1L);
         verify(productRepository, times(1)).deleteById(1L);
@@ -349,7 +351,7 @@ class ProductServiceTest {
     void delete_throwsExceptionForNonExistentId() {
         when(productRepository.existsById(2L)).thenReturn(false);
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> productService.delete(2L));
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> productService.deleteProduct(2L));
         assertEquals("Product not found with id: 2", exception.getMessage());
         verify(productRepository, times(1)).existsById(2L);
         verify(productRepository, never()).deleteById(2L);
@@ -360,7 +362,7 @@ class ProductServiceTest {
         List<Product> products = Collections.singletonList(product);
         when(productRepository.findByCategory("Electronics")).thenReturn(products);
 
-        List<Product> result = productService.findByCategory("Electronics");
+        List<ProductDTO> result = productService.findProductsByCategory("Electronics");
 
         assertEquals(1, result.size());
         assertEquals("Laptop HP", result.getFirst().getName());
@@ -371,7 +373,7 @@ class ProductServiceTest {
     void findByCategory_returnsEmptyListWhenNoProducts() {
         when(productRepository.findByCategory("Electronics")).thenReturn(Collections.emptyList());
 
-        List<Product> result = productService.findByCategory("Electronics");
+        List<ProductDTO> result = productService.findProductsByCategory("Electronics");
 
         assertTrue(result.isEmpty());
         verify(productRepository, times(1)).findByCategory("Electronics");
