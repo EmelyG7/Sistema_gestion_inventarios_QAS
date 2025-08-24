@@ -58,7 +58,7 @@ const App = ({ keycloak }) => {
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get('http://localhost:8080/api/products', {
+      const response = await axios.get('http://localhost:8080/api/v1/products', {
         headers: { Authorization: `Bearer ${keycloak.token}` }
       });
       setProducts(response.data);
@@ -129,7 +129,7 @@ const App = ({ keycloak }) => {
       return;
     }
     try {
-      await axios.post('http://localhost:8080/api/products', {
+      await axios.post('http://localhost:8080/api/v1/products', {
         ...newProduct,
         price: parseFloat(newProduct.price),
         initialQuantity: parseInt(newProduct.initialQuantity, 10)
@@ -153,7 +153,7 @@ const App = ({ keycloak }) => {
       return;
     }
     try {
-      await axios.put(`http://localhost:8080/api/products/${editingProduct.id}`, {
+      await axios.put(`http://localhost:8080/api/v1/products/${editingProduct.id}`, {
         ...editingProduct,
         price: parseFloat(editingProduct.price),
         initialQuantity: parseInt(editingProduct.initialQuantity, 10)
@@ -176,7 +176,7 @@ const App = ({ keycloak }) => {
     }
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
-        await axios.delete(`http://localhost:8080/api/products/${id}`, {
+        await axios.delete(`http://localhost:8080/api/v1/products/${id}`, {
           headers: { Authorization: `Bearer ${keycloak.token}` }
         });
         fetchProducts();

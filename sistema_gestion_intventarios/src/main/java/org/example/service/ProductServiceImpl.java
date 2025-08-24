@@ -1,5 +1,7 @@
 package org.example.service;
 
+import org.example.dto.ProductDTO;
+import org.example.dto.ProductSearchDTO;
 import org.example.entity.Product;
 import org.example.repository.ProductRepository;
 import org.springframework.stereotype.Service;
@@ -7,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -18,65 +22,203 @@ public class ProductServiceImpl implements ProductService {
         this.repository = repository;
     }
 
+    // === CRUD BÁSICO ===
+
     @Override
-    public Product save(Product product) {
-        if (product == null) {
-            throw new IllegalArgumentException("Product cannot be null");
-        }
+    public ProductDTO createProduct(ProductDTO productDTO) {
+        Product product = productDTO.toEntity();
         validateProduct(product);
+        Product saved = repository.save(product);
+        return ProductDTO.from(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> getAllProducts() {
+        return repository.findAll().stream()
+                .map(ProductDTO::from)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProductDTO getProductById(Long id) {
+        Product product = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
+        return ProductDTO.from(product);
+    }
+
+    @Override
+    public ProductDTO updateProduct(Long id, ProductDTO productDTO) {
+        Product existing = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
+
+        productDTO.updateEntity(existing);
+        validateProduct(existing);
+        Product updated = repository.save(existing);
+        return ProductDTO.from(updated);
+    }
+
+    @Override
+    public void deleteProduct(Long id) {
+        if (!repository.existsById(id)) {
+            throw new RuntimeException("Product not found with id: " + id);
+        }
+        repository.deleteById(id);
+    }
+
+    // === BÚSQUEDA SIMPLE ===
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> searchProducts(ProductSearchDTO searchDTO) {
+        List<Product> products = repository.findAll();
+
+        // Filtros básicos
+        if (searchDTO.getSearchTerm() != null && !searchDTO.getSearchTerm().trim().isEmpty()) {
+            products = repository.findBySearchTerm(searchDTO.getSearchTerm());
+        }
+
+        if (searchDTO.getCategory() != null && !searchDTO.getCategory().trim().isEmpty()) {
+            products = products.stream()
+                    .filter(p -> searchDTO.getCategory().equals(p.getCategory()))
+                    .collect(Collectors.toList());
+        }
+
+        if (searchDTO.getMinPrice() != null && searchDTO.getMaxPrice() != null) {
+            products = products.stream()
+                    .filter(p -> p.getPrice().compareTo(searchDTO.getMinPrice()) >= 0 &&
+                            p.getPrice().compareTo(searchDTO.getMaxPrice()) <= 0)
+                    .collect(Collectors.toList());
+        }
+
+        if (Boolean.TRUE.equals(searchDTO.getLowStockOnly())) {
+            products = products.stream()
+                    .filter(Product::isLowStock)
+                    .collect(Collectors.toList());
+        }
+
+        if (Boolean.TRUE.equals(searchDTO.getOutOfStockOnly())) {
+            products = products.stream()
+                    .filter(Product::isOutOfStock)
+                    .collect(Collectors.toList());
+        }
+
+        return products.stream()
+                .map(ProductDTO::from)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> findProductsByCategory(String category) {
+        return repository.findByCategory(category).stream()
+                .map(ProductDTO::from)
+                .collect(Collectors.toList());
+    }
+
+    // === STOCK STATUS ===
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> findLowStockProducts() {
+        return repository.findLowStockProducts().stream()
+                .map(ProductDTO::from)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductDTO> findOutOfStockProducts() {
+        return repository.findOutOfStockProducts().stream()
+                .map(ProductDTO::from)
+                .collect(Collectors.toList());
+    }
+
+    // === UTILIDADES ===
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> getAllCategories() {
+        return repository.findAllCategories();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> getBasicStats() {
+        List<Product> allProducts = repository.findAll();
+        List<Product> lowStock = repository.findLowStockProducts();
+        List<Product> outOfStock = repository.findOutOfStockProducts();
+        BigDecimal totalValue = repository.getTotalInventoryValue();
+
+        return Map.of(
+                "totalProducts", allProducts.size(),
+                "lowStockCount", lowStock.size(),
+                "outOfStockCount", outOfStock.size(),
+                "totalValue", totalValue != null ? totalValue : BigDecimal.ZERO,
+                "categories", getAllCategories().size()
+        );
+    }
+
+    // === MÉTODOS LEGACY ===
+
+    @Override
+    @Deprecated
+    public Product saveLegacy(Product product) {
+        validateProduct(product);
+        if (product.getMinimumStock() == null) {
+            product.setMinimumStock(5);
+        }
         return repository.save(product);
     }
 
     @Override
-    public List<Product> findAll() {
+    @Deprecated
+    @Transactional(readOnly = true)
+    public List<Product> findAllLegacy() {
         return repository.findAll();
     }
 
     @Override
-    public Product findById(Long id) {
-        return repository.findById(id).orElseThrow(() -> new RuntimeException("Product not found"));
+    @Deprecated
+    @Transactional(readOnly = true)
+    public Product findByIdLegacy(Long id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
     }
 
     @Override
-    public Product update(Long id, Product product) {
-        if (product == null) {
-            throw new IllegalArgumentException("Product cannot be null");
-        }
-        validateProduct(product);
-        Product existing = findById(id);
+    @Deprecated
+    public Product updateLegacy(Long id, Product product) {
+        Product existing = findByIdLegacy(id);
         existing.setName(product.getName());
         existing.setDescription(product.getDescription());
         existing.setCategory(product.getCategory());
         existing.setPrice(product.getPrice());
         existing.setInitialQuantity(product.getInitialQuantity());
+
+        if (product.getMinimumStock() != null) {
+            existing.setMinimumStock(product.getMinimumStock());
+        }
+
+        validateProduct(existing);
         return repository.save(existing);
     }
 
-    @Override
-    public void delete(Long id) {
-        if (!repository.existsById(id)) {
-            throw new RuntimeException("Product not found with id: " + id);
-        }
-        repository.deleteById(id);
-        repository.flush();
-    }
-
-
-    @Override
-    public List<Product> findByCategory(String category) {
-        return repository.findByCategory(category);
-    }
+    // === VALIDACIÓN PRIVADA ===
 
     private void validateProduct(Product product) {
-        System.out.println("Validating product: " + product);
         if (product.getName() == null || product.getName().trim().isEmpty()) {
             throw new IllegalArgumentException("Name cannot be empty");
         }
         if (product.getPrice() == null || product.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Price must be positive");
         }
-        if (product.getInitialQuantity() < 0) {
+        if (product.getInitialQuantity() == null || product.getInitialQuantity() < 0) {
             throw new IllegalArgumentException("Quantity must be non-negative");
+        }
+        if (product.getMinimumStock() != null && product.getMinimumStock() < 0) {
+            throw new IllegalArgumentException("Minimum stock must be non-negative");
         }
     }
 }
